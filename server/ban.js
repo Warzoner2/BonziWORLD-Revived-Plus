@@ -4,6 +4,16 @@ const settings = require("../settings.json");
 const io = require('./index.js').io;
 const path = require('path');
 
+// Utility to resolve a real client IP from socket headers/proxy
+function getSocketIp(socket) {
+    if (!socket) return undefined;
+    const h = socket.handshake && socket.handshake.headers ? socket.handshake.headers : {};
+    if (h['x-real-ip']) return h['x-real-ip'];
+    if (h['x-forwarded-for']) return h['x-forwarded-for'].split(',')[0].trim();
+    if (h['cf-connecting-ip']) return h['cf-connecting-ip'];
+    return socket.request && socket.request.connection ? socket.request.connection.remoteAddress : undefined;
+}
+
 const bansPath = path.join(__dirname, 'bans.json');
 let bans = {};
 
@@ -49,29 +59,12 @@ exports.addBan = function(ip, length, reason) {
 
 	var sockets = io.sockets.sockets;
 	var socketList = Object.keys(sockets);
+
 	for (var i = 0; i < socketList.length; i++) {
 		var socket = sockets[socketList[i]];
-		// Determine client IP considering proxies (X-Forwarded-For) and different socket.io versions
-		var clientIp = null;
-		try {
-			if (socket && socket.handshake && socket.handshake.headers && socket.handshake.headers['x-forwarded-for'])
-				clientIp = socket.handshake.headers['x-forwarded-for'];
-			else if (socket && socket.request && socket.request.headers && socket.request.headers['x-forwarded-for'])
-				clientIp = socket.request.headers['x-forwarded-for'];
-			else if (socket && socket.request && socket.request.connection && socket.request.connection.remoteAddress)
-				clientIp = socket.request.connection.remoteAddress;
-			else if (socket && socket.conn && socket.conn.remoteAddress)
-				clientIp = socket.conn.remoteAddress;
-		} catch (e) {
-			clientIp = null;
-		}
-
-		if (clientIp && clientIp.indexOf(',') !== -1) clientIp = clientIp.split(',')[0].trim();
-		if (typeof clientIp === 'string' && clientIp.indexOf('::ffff:') === 0) clientIp = clientIp.replace('::ffff:', '');
-
-		if (clientIp == ip) {
+		var sockIp = getSocketIp(socket) || socket.request.connection.remoteAddress;
+		if (sockIp == ip)
 			exports.handleBan(socket);
-		}
 	}
 	exports.saveBans();
 };
@@ -82,7 +75,7 @@ exports.removeBan = function(ip) {
 };
 
 exports.handleBan = function(socket) {
-	var ip = socket.request.connection.remoteAddress;
+	var ip = getSocketIp(socket) || socket.request.connection.remoteAddress;
 	
 	// Check if ban has expired (permanent bans have null end date)
 	if (bans[ip].end !== null && bans[ip].end <= new Date().getTime()) {
@@ -107,7 +100,8 @@ exports.kick = function(ip, reason) {
 
 	for (var i = 0; i < socketList.length; i++) {
 		var socket = sockets[socketList[i]];
-		if (socket.request.connection.remoteAddress == ip) {
+		var sockIp = getSocketIp(socket) || socket.request.connection.remoteAddress;
+		if (sockIp == ip) {
 			socket.emit('kick', {
 				reason: reason || "N/A"
 			});

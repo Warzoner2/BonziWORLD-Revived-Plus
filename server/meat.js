@@ -1023,7 +1023,13 @@ class User {
     }
 
     getIp() {
-        return this.socket.handshake.headers['cf-connecting-ip'] || this.socket.request.connection.remoteAddress;
+        // prefer real client IP from headers, since hosts like Render sit behind proxies
+        const h = this.socket.handshake.headers || {};
+        // x-forwarded-for may contain comma-separated list; take first
+        if (h['x-real-ip']) return h['x-real-ip'];
+        if (h['x-forwarded-for']) return h['x-forwarded-for'].split(',')[0].trim();
+        if (h['cf-connecting-ip']) return h['cf-connecting-ip'];
+        return this.socket.request.connection.remoteAddress;
     }
 	
     getAgent() {
