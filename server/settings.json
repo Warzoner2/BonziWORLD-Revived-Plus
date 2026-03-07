@@ -169,7 +169,6 @@
         "robby"
     ],
     "banLength": 1440,
-    "port": 3505,
     "express": {
         "serveStatic": true
     }

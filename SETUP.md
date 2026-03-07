@@ -10,7 +10,7 @@ cd server
 npm install
 node index.js
 ```
-After this, BonziWORLD Renewed+ will be accessible on port 3000. (http://localhost:3000/)
+After this, BonziWORLD Renewed+ will be accessible at the port specified by the `PORT` environment variable (for example `http://localhost:3000/` if you set `PORT=3000`).
 
 You'll also be able to visit `/wiki` for the wiki.  Set credentials in `server/settings.json` under `auth` (user/pass) and `sessionSecret`.  To enable AI moderation, export `OPENAI_API_KEY`.
 
